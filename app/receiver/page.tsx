@@ -219,23 +219,33 @@ export default function ReceiverDashboard() {
   // Check if PDF exists in loaded files
   const matchedFile = pdfName ? matchScrambleFile(files, pdfName) : null;
 
-  // Open PDF in new tab
-  const handleOpenPdf = async () => {
+  // Combined Copy Password & Open PDF in new tab
+  const handleCopyAndOpen = async () => {
+    // 1. Copy the password to clipboard immediately
+    try {
+      await navigator.clipboard.writeText(content);
+    } catch (e) {
+      console.warn('Clipboard write failed:', e);
+    }
+
+    // 2. If no scramble PDF name was in the transmission
     if (!pdfName) {
-      toast.error('No scramble PDF name found in message (format must be <pdf_name>:<password>)');
+      toast.success('Password copied to clipboard!');
       return;
     }
 
+    // 3. If no source folder selected yet
     if (!folderName) {
-      toast.error('Please select the source folder containing scramble PDFs first.');
+      toast.info('Password copied! Please select a source folder to automatically open PDFs.');
       handleSelectFolder();
       return;
     }
 
+    // 4. If directory permission is needed
     if (needsPermission && dirHandle) {
       const granted = await verifyPermission(dirHandle, false);
       if (!granted) {
-        toast.error('Permission needed to access source folder. Please click "Re-authorize".');
+        toast.info('Password copied! Please click "Re-authorize" to access the local folder.');
         return;
       }
       setNeedsPermission(false);
@@ -243,10 +253,10 @@ export default function ReceiverDashboard() {
       setFiles(scanned);
     }
 
-    // Try finding matching file
+    // 5. Locate matching PDF in local files
     let target = matchScrambleFile(files, pdfName);
 
-    // If not found yet and we have a dirHandle, try a live scan in case files were recently added
+    // Live rescan if not found in cache
     if (!target && dirHandle) {
       try {
         const fresh = await scanDirectoryHandle(dirHandle);
@@ -258,21 +268,22 @@ export default function ReceiverDashboard() {
     }
 
     if (!target) {
-      toast.error(`Could not find "${pdfName}" (.pdf) in "${folderName}".`);
+      toast.info(`Password copied! PDF "${pdfName}" not found in "${folderName}".`);
       return;
     }
 
+    // 6. Open the local PDF in a new tab
     try {
       const blob = await getScrambleFileBlob(target);
       const win = openBlobInNewTab(blob);
       if (!win) {
-        toast.error('Pop-up was blocked. Please allow pop-ups for this site to open PDFs.');
+        toast.success('Password copied! (Allow pop-ups to open the local PDF in a new tab)');
       } else {
-        toast.success(`Opening ${target.name} in a new tab...`);
+        toast.success(`Password copied! Opening ${target.name}...`);
       }
     } catch (err) {
       console.error('Failed to open PDF:', err);
-      toast.error('Failed to open PDF file.');
+      toast.error('Password copied, but failed to open local PDF file.');
     }
   };
 
@@ -417,28 +428,28 @@ export default function ReceiverDashboard() {
                 </div>
                 
                 <div className="flex-1 flex items-center justify-between">
-                  <div className="text-4xl sm:text-5xl lg:text-6xl font-bold text-white leading-tight break-words">
+                  <div
+                    onClick={() => handleCopy(content)}
+                    className="text-4xl sm:text-5xl lg:text-6xl font-bold text-white leading-tight break-words cursor-pointer hover:text-zinc-200 transition-colors"
+                    title="Click to copy password"
+                  >
                     {content}
                   </div>
-                  <div className="flex items-center gap-2 flex-shrink-0 ml-4">
-                    {/* Open PDF in New Tab Button */}
+                  <div className="flex items-center flex-shrink-0 ml-4">
+                    {/* Unified Copy Password & Open PDF Button */}
                     <button
-                      onClick={handleOpenPdf}
-                      className={`p-3 cursor-pointer transition-colors ${
-                        matchedFile
-                          ? 'text-white hover:text-emerald-400'
-                          : 'text-zinc-500 hover:text-white'
-                      }`}
-                      title={pdfName ? `Open "${pdfName}" in new tab` : 'Open PDF in new tab'}
+                      onClick={handleCopyAndOpen}
+                      className="flex items-center gap-2.5 px-5 py-3.5 bg-white text-black hover:bg-zinc-200 active:bg-zinc-300 font-bold text-xs uppercase tracking-wider transition-all cursor-pointer shadow-lg select-none"
+                      title="Copy password to clipboard and open scramble PDF in new tab"
                     >
                       <svg
                         xmlns="http://www.w3.org/2000/svg"
-                        width="28"
-                        height="28"
+                        width="18"
+                        height="18"
                         viewBox="0 0 24 24"
                         fill="none"
                         stroke="currentColor"
-                        strokeWidth="2"
+                        strokeWidth="2.5"
                         strokeLinecap="round"
                         strokeLinejoin="round"
                       >
@@ -446,28 +457,7 @@ export default function ReceiverDashboard() {
                         <path d="M10 14 21 3" />
                         <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
                       </svg>
-                    </button>
-
-                    {/* Copy Password Button */}
-                    <button 
-                      onClick={() => handleCopy(content)}
-                      className="p-3 text-zinc-500 hover:text-white cursor-pointer transition-colors"
-                      title="Copy Payload"
-                    >
-                      <svg
-                        xmlns="http://www.w3.org/2000/svg"
-                        width="28"
-                        height="28"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="2"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                      >
-                        <rect width="14" height="14" x="8" y="8" rx="2" ry="2"/>
-                        <path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/>
-                      </svg>
+                      <span>Copy & Open</span>
                     </button>
                   </div>
                 </div>
