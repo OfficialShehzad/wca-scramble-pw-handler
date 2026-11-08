@@ -188,14 +188,30 @@ export async function getScrambleFileBlob(item: ScrambleFile): Promise<Blob> {
   throw new Error('Unable to read file: missing file object and handle');
 }
 
-// Open Blob in a new tab
-export function openBlobInNewTab(blob: Blob): Window | null {
+// Open Scramble PDF in a new tab with explicit file name and instant window targeting
+export function openScramblePdfInTab(
+  blob: Blob,
+  fileName: string,
+  targetWindow?: Window | null
+): Window | null {
   if (typeof window === 'undefined') return null;
+
+  // Ensure blob has application/pdf MIME type
   const pdfBlob = blob.type === 'application/pdf'
     ? blob
     : new Blob([blob], { type: 'application/pdf' });
   const blobUrl = URL.createObjectURL(pdfBlob);
-  const newTab = window.open(blobUrl, '_blank');
+
+  const win = targetWindow ?? window.open('', '_blank');
+  if (win) {
+    try {
+      win.document.title = fileName;
+    } catch {
+      // Ignore cross-origin restriction if any
+    }
+    win.location.href = blobUrl;
+  }
+
   // Revoke object URL after a delay so the new tab has time to load the PDF
   setTimeout(() => {
     try {
@@ -204,5 +220,11 @@ export function openBlobInNewTab(blob: Blob): Window | null {
       // ignore
     }
   }, 60000);
-  return newTab;
+
+  return win;
+}
+
+// Backwards-compatible helper
+export function openBlobInNewTab(blob: Blob): Window | null {
+  return openScramblePdfInTab(blob, 'Scramble.pdf');
 }

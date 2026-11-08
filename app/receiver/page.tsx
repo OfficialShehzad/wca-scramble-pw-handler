@@ -9,7 +9,7 @@ import {
   scanDirectoryHandle,
   matchScrambleFile,
   getScrambleFileBlob,
-  openBlobInNewTab,
+  openScramblePdfInTab,
   saveStoredHandle,
   getStoredHandle,
   removeStoredHandle,
@@ -221,6 +221,9 @@ export default function ReceiverDashboard() {
 
   // Combined Copy Password & Open PDF in new tab
   const handleCopyAndOpen = async () => {
+    // Open a blank tab synchronously on click to completely bypass browser popup blocking
+    const targetWin = typeof window !== 'undefined' ? window.open('', '_blank') : null;
+
     // 1. Copy the password to clipboard immediately
     try {
       await navigator.clipboard.writeText(content);
@@ -230,12 +233,14 @@ export default function ReceiverDashboard() {
 
     // 2. If no scramble PDF name was in the transmission
     if (!pdfName) {
+      targetWin?.close();
       toast.success('Password copied to clipboard!');
       return;
     }
 
     // 3. If no source folder selected yet
     if (!folderName) {
+      targetWin?.close();
       toast.info('Password copied! Please select a source folder to automatically open PDFs.');
       handleSelectFolder();
       return;
@@ -245,6 +250,7 @@ export default function ReceiverDashboard() {
     if (needsPermission && dirHandle) {
       const granted = await verifyPermission(dirHandle, false);
       if (!granted) {
+        targetWin?.close();
         toast.info('Password copied! Please click "Re-authorize" to access the local folder.');
         return;
       }
@@ -268,20 +274,18 @@ export default function ReceiverDashboard() {
     }
 
     if (!target) {
+      targetWin?.close();
       toast.info(`Password copied! PDF "${pdfName}" not found in "${folderName}".`);
       return;
     }
 
-    // 6. Open the local PDF in a new tab
+    // 6. Open the local PDF in the new tab with its file name as the title
     try {
       const blob = await getScrambleFileBlob(target);
-      const win = openBlobInNewTab(blob);
-      if (!win) {
-        toast.success('Password copied! (Allow pop-ups to open the local PDF in a new tab)');
-      } else {
-        toast.success(`Password copied! Opening ${target.name}...`);
-      }
+      openScramblePdfInTab(blob, target.name, targetWin);
+      toast.success(`Password copied! Opening ${target.name}...`);
     } catch (err) {
+      targetWin?.close();
       console.error('Failed to open PDF:', err);
       toast.error('Password copied, but failed to open local PDF file.');
     }
